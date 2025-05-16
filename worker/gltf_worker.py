@@ -15,7 +15,7 @@ logger = logging.getLogger(__name__)
 
 # Import models outside of functions to avoid import errors
 try:
-    from app.deps import get_db, get_b2
+    from app.deps import get_db, get_b2, B2_BUCKET
     from app.models import OptimizationJob
     from sqlalchemy.orm import Session
 except ImportError:
@@ -25,63 +25,7 @@ except ImportError:
 GLTFPACK_PATH = os.getenv("GLTFPACK_PATH", "/usr/local/bin/gltfpack")
 B2_BUCKET = os.getenv("B2_BUCKET", "poly-slimmer")
 
-class WorkerSettings:
-    """Settings for ARQ worker"""
-    functions = ["optimize"]
-    redis_settings = RedisSettings.from_url(os.getenv("REDIS_URL", "redis://localhost:6379"))
-
-async def queue_optimize_job(redis_client, job_id, preview_only=False):
-    """Queue a job to optimize a 3D model"""
-    # Create a Redis pool
-    pool = await create_pool(WorkerSettings.redis_settings)
-    
-    # Queue the optimization job
-    job = await pool.enqueue_job(
-        "optimize", 
-        job_id, 
-        preview_only,
-        _job_id=f"optimize:{job_id}"
-    )
-    
-    # Close the pool
-    await pool.close()
-    
-    return job.job_id
-
-async def get_job_from_db(job_id):
-    """Get job from database"""
-    # Get the database session
-    db = next(get_db())
-    
-    # Get the job
-    job = db.query(OptimizationJob).filter(OptimizationJob.id == job_id).first()
-    
-    return job, db
-
-async def update_job_status(job, db, status, error_message=None):
-    """Update job status in the database"""
-    job.status = status
-    if error_message:
-        job.error_message = error_message
-    
-    job.updated_at = datetime.utcnow()
-    db.commit()
-
-async def run_command(cmd, timeout=120):
-    """Run a command asynchronously with timeout"""
-    process = await asyncio.create_subprocess_exec(
-        *cmd,
-        stdout=asyncio.subprocess.PIPE,
-        stderr=asyncio.subprocess.PIPE
-    )
-    
-    try:
-        stdout, stderr = await asyncio.wait_for(process.communicate(), timeout=timeout)
-        return process.returncode, stdout.decode(), stderr.decode()
-    except asyncio.TimeoutError:
-        process.kill()
-        raise TimeoutError(f"Command timed out after {timeout} seconds: {' '.join(cmd)}")
-
+# Define the optimization function
 async def optimize(ctx, job_id: int, preview_only: bool = False):
     """Optimize a 3D model with gltfpack"""
     try:
@@ -98,8 +42,8 @@ async def optimize(ctx, job_id: int, preview_only: bool = False):
         await update_job_status(job, db, "processing")
         
         # Get B2 client
-        b2 = get_b2()
-        bucket = b2.get_bucket_by_name(B2_BUCKET)
+        b2_api = get_b2()
+        bucket = b2_api.get_bucket_by_name(B2_BUCKET)
         
         # Create a temporary directory
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -108,8 +52,10 @@ async def optimize(ctx, job_id: int, preview_only: bool = False):
             output_file = temp_path / "output.glb"
             
             # Download input file
-            input_data = bucket.download_file_by_name(job.input_file)
-            input_file.write_bytes(input_data)
+            download_data = bucket.download_file_by_name(
+                file_name=job.input_file,
+                download_dest=str(input_file)
+            )
             
             # Get original vertex count
             vertex_info_cmd = [GLTFPACK_PATH, "-i", str(input_file), "-v"]
@@ -168,7 +114,10 @@ async def optimize(ctx, job_id: int, preview_only: bool = False):
                 
                 # Upload optimized file to B2
                 output_key = f"outputs/{job.user_email}/{job_id}.glb"
-                bucket.upload_bytes(output_file.read_bytes(), output_key)
+                bucket.upload_local_file(
+                    local_file=str(output_file),
+                    file_name=output_key
+                )
                 
                 # Update job record
                 job.output_file = output_key
@@ -187,4 +136,68 @@ async def optimize(ctx, job_id: int, preview_only: bool = False):
     
     except Exception as e:
         logger.error(f"Unhandled exception in optimize job: {str(e)}")
-        return {"status": "error", "message": str(e)} 
+        return {"status": "error", "message": str(e)}
+
+async def get_job_from_db(job_id):
+    """Get job from database"""
+    # Get the database session
+    db = next(get_db())
+    
+    # Get the job
+    job = db.query(OptimizationJob).filter(OptimizationJob.id == job_id).first()
+    
+    return job, db
+
+async def update_job_status(job, db, status, error_message=None):
+    """Update job status in the database"""
+    job.status = status
+    if error_message:
+        job.error_message = error_message
+    
+    job.updated_at = datetime.utcnow()
+    db.commit()
+
+async def run_command(cmd, timeout=120):
+    """Run a command asynchronously with timeout"""
+    process = await asyncio.create_subprocess_exec(
+        *cmd,
+        stdout=asyncio.subprocess.PIPE,
+        stderr=asyncio.subprocess.PIPE
+    )
+    
+    try:
+        stdout, stderr = await asyncio.wait_for(process.communicate(), timeout=timeout)
+        return process.returncode, stdout.decode(), stderr.decode()
+    except asyncio.TimeoutError:
+        process.kill()
+        raise TimeoutError(f"Command timed out after {timeout} seconds: {' '.join(cmd)}")
+
+async def queue_optimize_job(redis_client, job_id, preview_only=False):
+    """Queue a job to optimize a 3D model"""
+    # Create a Redis pool
+    pool = await create_pool(WorkerSettings.redis_settings)
+    
+    # Queue the optimization job
+    job = await pool.enqueue_job(
+        "optimize", 
+        job_id, 
+        preview_only,
+        _job_id=f"optimize:{job_id}"
+    )
+    
+    # Close the pool
+    await pool.close()
+    
+    return job.job_id
+
+# ARQ Worker settings - this must be at the end of the file
+class WorkerSettings:
+    """Settings for ARQ worker"""
+    redis_settings = RedisSettings.from_dsn(os.getenv("REDIS_URL", "redis://localhost:6379"))
+    
+    # Register functions
+    functions = [optimize]
+    
+    # Worker configuration
+    max_jobs = 10
+    job_timeout = 300  # 5 minutes 

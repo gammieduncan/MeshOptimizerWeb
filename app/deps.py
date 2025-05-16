@@ -6,7 +6,7 @@ import redis.asyncio as redis
 from sqlalchemy import create_engine
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker, Session
-from backblaze.b2 import B2
+from b2sdk.v2 import InMemoryAccountInfo, B2Api
 from datetime import datetime, timedelta
 from jose import jwt
 
@@ -45,7 +45,10 @@ def get_stripe():
 @lru_cache()
 def get_b2():
     """Get Backblaze B2 client"""
-    return B2(key_id=B2_KEY_ID, application_key=B2_KEY)
+    info = InMemoryAccountInfo()
+    b2_api = B2Api(info)
+    b2_api.authorize_account("production", B2_KEY_ID, B2_KEY)
+    return b2_api
 
 @lru_cache()
 def get_redis():

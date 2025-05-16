@@ -1,16 +1,22 @@
 #!/usr/bin/env python
 import os
 import sys
-import asyncio
-from arq.worker import Worker
+from pathlib import Path
 
-from worker.gltf_worker import WorkerSettings
+# Add the project root to the Python path
+sys.path.append(str(Path(__file__).parent.parent))
 
-async def main():
-    """Run the ARQ worker"""
-    print("Starting ARQ worker...")
-    worker = Worker(WorkerSettings)
-    await worker.run()
+# Import the ARQ worker settings
+from worker.gltf_worker import WorkerSettings, optimize
 
 if __name__ == "__main__":
-    asyncio.run(main()) 
+    print("Starting ARQ worker...")
+    redis_url = os.getenv("REDIS_URL", "redis://localhost:6379")
+    print("Make sure Redis is running at:", redis_url)
+    print("Press Ctrl+C to stop the worker")
+    
+    # Import arq runner function directly
+    from arq.worker import run_worker
+    
+    # Run the worker - this handles event loop properly
+    run_worker(WorkerSettings) 

@@ -9,7 +9,7 @@ from fastapi.responses import JSONResponse, RedirectResponse
 from sqlalchemy.orm import Session
 from jose import JWTError
 
-from app.deps import get_db, get_b2, get_redis, decode_token
+from app.deps import get_db, get_b2, get_redis, decode_token, B2_BUCKET
 from app.models import OptimizationJob, UserPlan
 from worker.gltf_worker import queue_optimize_job
 
@@ -51,7 +51,7 @@ def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(securit
 async def create_preview(
     file: UploadFile = File(...),
     db: Session = Depends(get_db),
-    b2 = Depends(get_b2)
+    b2_api = Depends(get_b2)
 ):
     """Upload a model and create a preview without optimization"""
     # Validate file type
@@ -77,8 +77,12 @@ async def create_preview(
     
     try:
         # Upload to B2
-        bucket = b2.get_bucket_by_name(os.getenv("B2_BUCKET"))
-        bucket.upload_local_file(tmp_path, file_key)
+        bucket = b2_api.get_bucket_by_name(B2_BUCKET)
+        with open(tmp_path, 'rb') as file_data:
+            bucket.upload_local_file(
+                local_file=tmp_path,
+                file_name=file_key
+            )
         
         # Create job record for preview only
         job = OptimizationJob(
@@ -111,7 +115,7 @@ async def optimize_model(
     target_triangles: int = Form(...),
     user: UserPlan = Depends(get_current_user),
     db: Session = Depends(get_db),
-    b2 = Depends(get_b2)
+    b2_api = Depends(get_b2)
 ):
     """Upload and optimize a 3D model"""
     # Validate file type
@@ -141,8 +145,12 @@ async def optimize_model(
     
     try:
         # Upload to B2
-        bucket = b2.get_bucket_by_name(os.getenv("B2_BUCKET"))
-        bucket.upload_local_file(tmp_path, file_key)
+        bucket = b2_api.get_bucket_by_name(B2_BUCKET)
+        with open(tmp_path, 'rb') as file_data:
+            bucket.upload_local_file(
+                local_file=tmp_path,
+                file_name=file_key
+            )
         
         # Create job record
         job = OptimizationJob(
@@ -195,10 +203,23 @@ async def get_job_status(
         response["vertex_count_after"] = job.vertex_count_after
         
         if job.preview_file:
-            b2 = get_b2()
-            bucket = b2.get_bucket_by_name(os.getenv("B2_BUCKET"))
-            preview_url = bucket.get_download_url(job.preview_file, expires_in=3600)
-            response["preview_url"] = preview_url
+            b2_api = get_b2()
+            bucket = b2_api.get_bucket_by_name(B2_BUCKET)
+            
+            # Get download authorization
+            download_auth = b2_api.get_download_authorization(
+                bucket_name=B2_BUCKET,
+                file_name_prefix=job.preview_file,
+                valid_duration_in_seconds=3600
+            )
+            
+            # Get the download URL with authorization
+            download_url = b2_api.get_download_url_with_auth(
+                download_auth=download_auth,
+                file_name=job.preview_file
+            )
+            
+            response["preview_url"] = download_url
     
     elif job.status == "failed":
         response["error_message"] = job.error_message
@@ -229,8 +250,20 @@ async def download_optimized_model(
         raise HTTPException(status_code=400, detail="Output file not available")
     
     # Generate signed URL for download
-    b2 = get_b2()
-    bucket = b2.get_bucket_by_name(os.getenv("B2_BUCKET"))
-    download_url = bucket.get_download_url(job.output_file, expires_in=3600)
+    b2_api = get_b2()
+    bucket = b2_api.get_bucket_by_name(B2_BUCKET)
+    
+    # Get download authorization
+    download_auth = b2_api.get_download_authorization(
+        bucket_name=B2_BUCKET,
+        file_name_prefix=job.output_file,
+        valid_duration_in_seconds=3600
+    )
+    
+    # Get the download URL with authorization
+    download_url = b2_api.get_download_url_with_auth(
+        download_auth=download_auth,
+        file_name=job.output_file
+    )
     
     return RedirectResponse(url=download_url) 
