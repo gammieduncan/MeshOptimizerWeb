@@ -1,0 +1,607 @@
+{% extends "base.html" %}
+
+{% block content %}
+<!-- Hero Section -->
+<div class="bg-white">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 md:py-24">
+        <div class="text-center">
+            <h1 class="text-4xl font-extrabold text-gray-900 sm:text-5xl md:text-6xl">
+                <span class="block">Shrink your avatar to</span>
+                <span class="block text-indigo-600">70,000 polygons in 20 seconds</span>
+            </h1>
+            <p class="mt-3 max-w-md mx-auto text-base text-gray-500 sm:text-lg md:mt-5 md:text-xl md:max-w-3xl">
+                Optimize 3D models for VRChat, game mods, and NFTs without Blender. Fast, easy, and animation-safe.
+            </p>
+            <div class="mt-5 max-w-md mx-auto sm:flex sm:justify-center md:mt-8">
+                <div class="rounded-md shadow">
+                    <a href="#upload" class="w-full flex items-center justify-center px-8 py-3 border border-transparent text-base font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 md:py-4 md:text-lg md:px-10">
+                        Upload & Preview
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Features Section -->
+<div id="features" class="py-12 bg-gray-50">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div class="lg:text-center">
+            <h2 class="text-base text-indigo-600 font-semibold tracking-wide uppercase">Features</h2>
+            <p class="mt-2 text-3xl leading-8 font-extrabold tracking-tight text-gray-900 sm:text-4xl">
+                Smart Optimization for 3D Creators
+            </p>
+        </div>
+
+        <div class="mt-10">
+            <dl class="space-y-10 md:space-y-0 md:grid md:grid-cols-3 md:gap-x-8 md:gap-y-10">
+                <div class="relative">
+                    <dt>
+                        <div class="absolute flex items-center justify-center h-12 w-12 rounded-md bg-indigo-500 text-white">
+                            <i class="fas fa-cube"></i>
+                        </div>
+                        <p class="ml-16 text-lg leading-6 font-medium text-gray-900">No Blender Required</p>
+                    </dt>
+                    <dd class="mt-2 ml-16 text-base text-gray-500">
+                        Upload your models directly through your browser. No software installation or technical knowledge needed.
+                    </dd>
+                </div>
+
+                <div class="relative">
+                    <dt>
+                        <div class="absolute flex items-center justify-center h-12 w-12 rounded-md bg-indigo-500 text-white">
+                            <i class="fas fa-running"></i>
+                        </div>
+                        <p class="ml-16 text-lg leading-6 font-medium text-gray-900">Rig & Animation Safe</p>
+                    </dt>
+                    <dd class="mt-2 ml-16 text-base text-gray-500">
+                        Our optimization preserves rigs and animations, so your characters will move naturally with fewer polygons.
+                    </dd>
+                </div>
+
+                <div class="relative">
+                    <dt>
+                        <div class="absolute flex items-center justify-center h-12 w-12 rounded-md bg-indigo-500 text-white">
+                            <i class="fas fa-shield-alt"></i>
+                        </div>
+                        <p class="ml-16 text-lg leading-6 font-medium text-gray-900">Privacy First</p>
+                    </dt>
+                    <dd class="mt-2 ml-16 text-base text-gray-500">
+                        All files are automatically deleted after 24 hours. Your models never leave our secure servers.
+                    </dd>
+                </div>
+            </dl>
+        </div>
+    </div>
+</div>
+
+<!-- Upload & Preview Section -->
+<div id="upload" class="py-12 bg-white">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div class="lg:text-center">
+            <h2 class="text-base text-indigo-600 font-semibold tracking-wide uppercase">Try It Now</h2>
+            <p class="mt-2 text-3xl leading-8 font-extrabold tracking-tight text-gray-900 sm:text-4xl">
+                Upload Your Model
+            </p>
+            <p class="mt-4 max-w-2xl text-xl text-gray-500 lg:mx-auto">
+                Drop your GLB, FBX, or GLTF file to see a preview with reduced polygons. Purchase to download the optimized version.
+            </p>
+        </div>
+
+        <div class="mt-10 max-w-3xl mx-auto">
+            <!-- File Upload Drop Zone -->
+            <div id="drop-zone" class="drop-zone p-10 text-center cursor-pointer">
+                <div id="drop-zone-content">
+                    <i class="fas fa-cloud-upload-alt text-4xl text-indigo-500 mb-3"></i>
+                    <p class="text-gray-700">Drag & drop your 3D model here or click to browse</p>
+                    <p class="text-sm text-gray-500 mt-2">Supports GLB, FBX, GLTF (Max 100MB)</p>
+                </div>
+                <input type="file" id="file-input" class="hidden" accept=".glb,.fbx,.gltf">
+            </div>
+            
+            <!-- Upload Progress -->
+            <div id="upload-progress" class="mt-4 hidden">
+                <div class="w-full bg-gray-200 rounded-full h-2.5">
+                    <div id="progress-bar" class="bg-indigo-600 h-2.5 rounded-full" style="width: 0%"></div>
+                </div>
+                <p id="progress-text" class="text-sm text-gray-600 mt-2">Uploading... 0%</p>
+            </div>
+            
+            <!-- Preview Container (hidden initially) -->
+            <div id="preview-container" class="mt-8 hidden">
+                <div class="bg-white shadow overflow-hidden sm:rounded-lg">
+                    <div class="px-4 py-5 sm:px-6 flex justify-between items-center">
+                        <div>
+                            <h3 class="text-lg leading-6 font-medium text-gray-900">Model Preview</h3>
+                            <p class="mt-1 max-w-2xl text-sm text-gray-500">Watermarked preview at <span id="preview-triangle-count">10,000</span> triangles</p>
+                        </div>
+                        <a id="view-fullscreen" href="#" class="text-indigo-600 hover:text-indigo-800">
+                            <i class="fas fa-expand"></i> Full Screen
+                        </a>
+                    </div>
+                    <div class="border-t border-gray-200">
+                        <div class="canvas-container" id="preview-canvas">
+                            <!-- Three.js canvas will be inserted here -->
+                            <div class="absolute top-2 left-2 bg-black bg-opacity-50 text-white px-3 py-1 rounded-lg" id="vertex-count">
+                                Original: <span id="original-count">0</span> | Reduced: <span id="reduced-count">0</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Target Triangle Slider -->
+                <div class="mt-6">
+                    <label for="target-slider" class="block text-sm font-medium text-gray-700">Target Triangle Count</label>
+                    <input type="range" id="target-slider" name="target-slider" min="1000" max="100000" step="100" value="10000" 
+                        class="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer mt-2">
+                    <div class="flex justify-between text-xs text-gray-500 mt-1">
+                        <span>1,000</span>
+                        <span id="current-target">10,000</span>
+                        <span>100,000</span>
+                    </div>
+                </div>
+                
+                <!-- Optimize Button -->
+                <div class="mt-8 flex justify-center">
+                    <div id="purchase-options" class="grid grid-cols-1 md:grid-cols-2 gap-4 w-full">
+                        <a href="/checkout/EXPORT_1" class="flex items-center justify-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700">
+                            Single Export ($4)
+                        </a>
+                        <a href="/checkout/CREATOR_MONTH" class="flex items-center justify-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-green-600 hover:bg-green-700">
+                            Unlimited for 30 Days ($25)
+                        </a>
+                    </div>
+                    
+                    <!-- For authenticated users (hidden initially) -->
+                    <button id="optimize-button" class="hidden w-full flex items-center justify-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700">
+                        Optimize Now
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Pricing Section -->
+<div id="pricing" class="py-12 bg-gray-50">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div class="lg:text-center">
+            <h2 class="text-base text-indigo-600 font-semibold tracking-wide uppercase">Pricing</h2>
+            <p class="mt-2 text-3xl leading-8 font-extrabold tracking-tight text-gray-900 sm:text-4xl">
+                Simple & Transparent
+            </p>
+            <p class="mt-4 max-w-2xl text-xl text-gray-500 lg:mx-auto">
+                Choose the plan that works for your needs. No hidden fees.
+            </p>
+        </div>
+
+        <div class="mt-10 max-w-lg mx-auto grid gap-5 lg:grid-cols-2 lg:max-w-4xl">
+            <!-- Single Export Plan -->
+            <div class="bg-white shadow rounded-lg overflow-hidden">
+                <div class="px-6 py-8">
+                    <div class="flex items-center">
+                        <h3 class="text-2xl font-bold text-gray-900">Single Export</h3>
+                        <span class="ml-3 inline-flex items-center px-3 py-0.5 rounded-full text-sm font-medium bg-blue-100 text-blue-800">
+                            Popular
+                        </span>
+                    </div>
+                    <div class="mt-4 flex items-baseline text-6xl font-extrabold">
+                        $4
+                        <span class="ml-1 text-2xl font-medium text-gray-500">per model</span>
+                    </div>
+                    <p class="mt-5 text-lg text-gray-500">
+                        Perfect for one-time optimization needs.
+                    </p>
+                </div>
+                <div class="px-6 pt-6 pb-8">
+                    <ul class="space-y-4">
+                        <li class="flex items-start">
+                            <div class="flex-shrink-0">
+                                <i class="fas fa-check text-green-500"></i>
+                            </div>
+                            <p class="ml-3 text-base text-gray-700">
+                                Single 3D model export
+                            </p>
+                        </li>
+                        <li class="flex items-start">
+                            <div class="flex-shrink-0">
+                                <i class="fas fa-check text-green-500"></i>
+                            </div>
+                            <p class="ml-3 text-base text-gray-700">
+                                Full resolution download
+                            </p>
+                        </li>
+                        <li class="flex items-start">
+                            <div class="flex-shrink-0">
+                                <i class="fas fa-check text-green-500"></i>
+                            </div>
+                            <p class="ml-3 text-base text-gray-700">
+                                24-hour access to download
+                            </p>
+                        </li>
+                    </ul>
+                    <div class="mt-8">
+                        <a href="/checkout/EXPORT_1" class="w-full flex items-center justify-center px-5 py-3 border border-transparent text-base font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700">
+                            Get Started
+                        </a>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Unlimited Plan -->
+            <div class="bg-white shadow rounded-lg overflow-hidden border-2 border-indigo-500">
+                <div class="px-6 py-8">
+                    <div class="flex items-center">
+                        <h3 class="text-2xl font-bold text-gray-900">Creator Plan</h3>
+                        <span class="ml-3 inline-flex items-center px-3 py-0.5 rounded-full text-sm font-medium bg-indigo-100 text-indigo-800">
+                            Best Value
+                        </span>
+                    </div>
+                    <div class="mt-4 flex items-baseline text-6xl font-extrabold">
+                        $25
+                        <span class="ml-1 text-2xl font-medium text-gray-500">/ 30 days</span>
+                    </div>
+                    <p class="mt-5 text-lg text-gray-500">
+                        For creators who need multiple optimizations.
+                    </p>
+                </div>
+                <div class="px-6 pt-6 pb-8">
+                    <ul class="space-y-4">
+                        <li class="flex items-start">
+                            <div class="flex-shrink-0">
+                                <i class="fas fa-check text-green-500"></i>
+                            </div>
+                            <p class="ml-3 text-base text-gray-700">
+                                <strong>Unlimited</strong> model exports
+                            </p>
+                        </li>
+                        <li class="flex items-start">
+                            <div class="flex-shrink-0">
+                                <i class="fas fa-check text-green-500"></i>
+                            </div>
+                            <p class="ml-3 text-base text-gray-700">
+                                Priority processing
+                            </p>
+                        </li>
+                        <li class="flex items-start">
+                            <div class="flex-shrink-0">
+                                <i class="fas fa-check text-green-500"></i>
+                            </div>
+                            <p class="ml-3 text-base text-gray-700">
+                                30 days of unlimited access
+                            </p>
+                        </li>
+                    </ul>
+                    <div class="mt-8">
+                        <a href="/checkout/CREATOR_MONTH" class="w-full flex items-center justify-center px-5 py-3 border border-transparent text-base font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700">
+                            Get Started
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    document.addEventListener('DOMContentLoaded', () => {
+        const dropZone = document.getElementById('drop-zone');
+        const fileInput = document.getElementById('file-input');
+        const uploadProgress = document.getElementById('upload-progress');
+        const progressBar = document.getElementById('progress-bar');
+        const progressText = document.getElementById('progress-text');
+        const previewContainer = document.getElementById('preview-container');
+        const targetSlider = document.getElementById('target-slider');
+        const currentTarget = document.getElementById('current-target');
+        const originalCount = document.getElementById('original-count');
+        const reducedCount = document.getElementById('reduced-count');
+        const optimizeButton = document.getElementById('optimize-button');
+        const purchaseOptions = document.getElementById('purchase-options');
+        
+        let jobId = null;
+        let fileToUpload = null;
+        
+        // Initialize Three.js variables
+        let scene, camera, renderer, controls, model;
+        
+        // Check if user is authenticated
+        if (isAuthenticated()) {
+            optimizeButton.classList.remove('hidden');
+            purchaseOptions.classList.add('hidden');
+        }
+        
+        // Handle file selection
+        function handleFile(file) {
+            if (!file) return;
+            
+            const fileExtension = file.name.split('.').pop().toLowerCase();
+            if (!['glb', 'fbx', 'gltf'].includes(fileExtension)) {
+                alert('Please upload a GLB, FBX, or GLTF file');
+                return;
+            }
+            
+            if (file.size > 100 * 1024 * 1024) {
+                alert('File size exceeds 100MB limit');
+                return;
+            }
+            
+            fileToUpload = file;
+            uploadFile(file);
+        }
+        
+        // Upload file to server
+        function uploadFile(file) {
+            const formData = new FormData();
+            formData.append('file', file);
+            
+            const xhr = new XMLHttpRequest();
+            
+            xhr.open('POST', '/api/preview');
+            
+            xhr.upload.addEventListener('progress', (event) => {
+                if (event.lengthComputable) {
+                    const percentComplete = Math.round((event.loaded / event.total) * 100);
+                    progressBar.style.width = percentComplete + '%';
+                    progressText.textContent = `Uploading... ${percentComplete}%`;
+                }
+            });
+            
+            xhr.onload = function() {
+                if (xhr.status === 200) {
+                    const response = JSON.parse(xhr.responseText);
+                    jobId = response.job_id;
+                    
+                    // Poll for job status
+                    pollJobStatus(jobId);
+                } else {
+                    alert('Upload failed. Please try again.');
+                    uploadProgress.classList.add('hidden');
+                }
+            };
+            
+            xhr.onerror = function() {
+                alert('Upload failed. Please try again.');
+                uploadProgress.classList.add('hidden');
+            };
+            
+            uploadProgress.classList.remove('hidden');
+            xhr.send(formData);
+        }
+        
+        // Poll job status
+        function pollJobStatus(id) {
+            const pollInterval = setInterval(() => {
+                fetch(`/api/status/${id}`)
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.status === 'completed') {
+                            clearInterval(pollInterval);
+                            progressText.textContent = 'Processing complete!';
+                            
+                            // Display preview
+                            previewContainer.classList.remove('hidden');
+                            
+                            // Update vertex counts
+                            if (data.vertex_count_before) {
+                                originalCount.textContent = data.vertex_count_before.toLocaleString();
+                            }
+                            
+                            if (data.vertex_count_after) {
+                                reducedCount.textContent = data.vertex_count_after.toLocaleString();
+                            }
+                            
+                            // Initialize 3D preview
+                            initPreview(data.preview_url);
+                            
+                        } else if (data.status === 'failed') {
+                            clearInterval(pollInterval);
+                            progressText.textContent = `Error: ${data.error_message || 'Processing failed'}`;
+                        } else {
+                            progressText.textContent = 'Processing...';
+                        }
+                    })
+                    .catch(error => {
+                        console.error('Error polling job status:', error);
+                    });
+            }, 2000);
+        }
+        
+        // Initialize 3D preview
+        function initPreview(modelUrl) {
+            const container = document.getElementById('preview-canvas');
+            
+            // Initialize Three.js scene
+            scene = new THREE.Scene();
+            scene.background = new THREE.Color(0xf3f4f6);
+            
+            // Camera
+            camera = new THREE.PerspectiveCamera(45, container.clientWidth / container.clientHeight, 0.1, 1000);
+            camera.position.set(0, 1, 5);
+            
+            // Renderer
+            renderer = new THREE.WebGLRenderer({ antialias: true });
+            renderer.setSize(container.clientWidth, container.clientHeight);
+            renderer.outputEncoding = THREE.sRGBEncoding;
+            renderer.shadowMap.enabled = true;
+            container.appendChild(renderer.domElement);
+            
+            // Controls
+            controls = new THREE.OrbitControls(camera, renderer.domElement);
+            controls.enableDamping = true;
+            controls.dampingFactor = 0.05;
+            
+            // Lights
+            const ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
+            scene.add(ambientLight);
+            
+            const directionalLight = new THREE.DirectionalLight(0xffffff, 1);
+            directionalLight.position.set(1, 1, 1);
+            scene.add(directionalLight);
+            
+            // Load model
+            const loader = new THREE.GLTFLoader();
+            loader.load(
+                modelUrl,
+                function (gltf) {
+                    model = gltf.scene;
+                    
+                    // Center model
+                    const box = new THREE.Box3().setFromObject(model);
+                    const center = box.getCenter(new THREE.Vector3());
+                    const size = box.getSize(new THREE.Vector3());
+                    
+                    // Reset model position to center
+                    model.position.x = -center.x;
+                    model.position.y = -center.y;
+                    model.position.z = -center.z;
+                    
+                    // Adjust camera
+                    const maxDim = Math.max(size.x, size.y, size.z);
+                    camera.position.set(0, maxDim / 2, maxDim * 2);
+                    camera.lookAt(0, 0, 0);
+                    
+                    // Add model to scene
+                    scene.add(model);
+                    
+                    // Add watermark
+                    addWatermark();
+                    
+                    // Start animation loop
+                    animate();
+                },
+                function (xhr) {
+                    // Progress callback
+                },
+                function (error) {
+                    console.error('Error loading model:', error);
+                }
+            );
+            
+            // Handle window resize
+            window.addEventListener('resize', onWindowResize);
+        }
+        
+        // Add watermark to preview
+        function addWatermark() {
+            const canvas = renderer.domElement;
+            const context = canvas.getContext('2d');
+            
+            // Add watermark in animation loop
+            renderer.domElement.style.position = 'relative';
+            const watermarkOverlay = document.createElement('div');
+            watermarkOverlay.style.position = 'absolute';
+            watermarkOverlay.style.top = '0';
+            watermarkOverlay.style.left = '0';
+            watermarkOverlay.style.width = '100%';
+            watermarkOverlay.style.height = '100%';
+            watermarkOverlay.style.pointerEvents = 'none';
+            watermarkOverlay.style.background = 'url("/static/images/watermark.png") repeat';
+            watermarkOverlay.style.opacity = '0.2';
+            renderer.domElement.parentNode.appendChild(watermarkOverlay);
+        }
+        
+        // Handle window resize
+        function onWindowResize() {
+            const container = document.getElementById('preview-canvas');
+            camera.aspect = container.clientWidth / container.clientHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(container.clientWidth, container.clientHeight);
+        }
+        
+        // Animation loop
+        function animate() {
+            requestAnimationFrame(animate);
+            controls.update();
+            renderer.render(scene, camera);
+        }
+        
+        // Event: Drag over
+        dropZone.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            dropZone.classList.add('drag-over');
+        });
+        
+        // Event: Drag leave
+        dropZone.addEventListener('dragleave', () => {
+            dropZone.classList.remove('drag-over');
+        });
+        
+        // Event: Drop
+        dropZone.addEventListener('drop', (e) => {
+            e.preventDefault();
+            dropZone.classList.remove('drag-over');
+            
+            if (e.dataTransfer.files.length) {
+                handleFile(e.dataTransfer.files[0]);
+            }
+        });
+        
+        // Event: Click to select file
+        dropZone.addEventListener('click', () => {
+            fileInput.click();
+        });
+        
+        // Event: File selected
+        fileInput.addEventListener('change', () => {
+            if (fileInput.files.length) {
+                handleFile(fileInput.files[0]);
+            }
+        });
+        
+        // Event: Target slider change
+        targetSlider.addEventListener('input', () => {
+            const value = targetSlider.value;
+            currentTarget.textContent = parseInt(value).toLocaleString();
+            
+            // Update preview triangle count
+            document.getElementById('preview-triangle-count').textContent = parseInt(value).toLocaleString();
+            
+            // Update reduced count if we have a preview
+            if (model) {
+                reducedCount.textContent = parseInt(value).toLocaleString();
+            }
+        });
+        
+        // Event: Optimize button click
+        optimizeButton.addEventListener('click', () => {
+            if (!fileToUpload) {
+                alert('Please upload a file first');
+                return;
+            }
+            
+            const token = getToken();
+            if (!token) {
+                alert('Please log in to optimize models');
+                return;
+            }
+            
+            const formData = new FormData();
+            formData.append('file', fileToUpload);
+            formData.append('target_triangles', targetSlider.value);
+            
+            fetch('/api/optimize', {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${token}`
+                },
+                body: formData
+            })
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error('Optimization failed');
+                }
+                return response.json();
+            })
+            .then(data => {
+                alert('Optimization job queued! Job ID: ' + data.job_id);
+                // Redirect to dashboard or job status page
+            })
+            .catch(error => {
+                alert('Error: ' + error.message);
+            });
+        });
+    });
+</script>
+{% endblock %} 

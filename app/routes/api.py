@@ -1,0 +1,236 @@
+import os
+import uuid
+import tempfile
+from datetime import datetime, timedelta
+from typing import Optional
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+from fastapi.responses import JSONResponse, RedirectResponse
+from sqlalchemy.orm import Session
+from jose import JWTError
+
+from app.deps import get_db, get_b2, get_redis, decode_token
+from app.models import OptimizationJob, UserPlan
+from worker.gltf_worker import queue_optimize_job
+
+router = APIRouter()
+security = HTTPBearer()
+
+# Constants
+ALLOWED_EXTENSIONS = {".glb", ".fbx", ".gltf"}
+MAX_FILE_SIZE = 100 * 1024 * 1024  # 100 MB
+
+def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(security), db: Session = Depends(get_db)):
+    """Get current user from JWT token"""
+    try:
+        token = credentials.credentials
+        payload = decode_token(token)
+        
+        email = payload.get("sub")
+        if email is None:
+            raise HTTPException(status_code=401, detail="Invalid authentication credentials")
+        
+        # Verify if user exists in db
+        user = db.query(UserPlan).filter(UserPlan.email == email).first()
+        if not user:
+            raise HTTPException(status_code=401, detail="User not found")
+        
+        # Check if subscription is valid
+        if user.plan == "creator" and user.expires_at and user.expires_at < datetime.utcnow():
+            raise HTTPException(status_code=403, detail="Subscription expired")
+        
+        # Check if quota is available for single plan
+        if user.plan == "single" and user.quota <= 0:
+            raise HTTPException(status_code=403, detail="No export credits remaining")
+        
+        return user
+    except JWTError:
+        raise HTTPException(status_code=401, detail="Invalid authentication token")
+
+@router.post("/preview")
+async def create_preview(
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db),
+    b2 = Depends(get_b2)
+):
+    """Upload a model and create a preview without optimization"""
+    # Validate file type
+    file_ext = os.path.splitext(file.filename)[1].lower()
+    if file_ext not in ALLOWED_EXTENSIONS:
+        raise HTTPException(status_code=400, detail=f"Invalid file type. Allowed types: {', '.join(ALLOWED_EXTENSIONS)}")
+    
+    # Read file
+    contents = await file.read()
+    
+    # Check file size
+    if len(contents) > MAX_FILE_SIZE:
+        raise HTTPException(status_code=400, detail=f"File too large. Maximum size: {MAX_FILE_SIZE / 1024 / 1024}MB")
+    
+    # Generate unique filename
+    unique_id = str(uuid.uuid4())
+    file_key = f"uploads/{unique_id}{file_ext}"
+    
+    # Save file to temp directory
+    with tempfile.NamedTemporaryFile(delete=False) as tmp:
+        tmp.write(contents)
+        tmp_path = tmp.name
+    
+    try:
+        # Upload to B2
+        bucket = b2.get_bucket_by_name(os.getenv("B2_BUCKET"))
+        bucket.upload_local_file(tmp_path, file_key)
+        
+        # Create job record for preview only
+        job = OptimizationJob(
+            user_email="anonymous",  # Preview doesn't require authentication
+            input_file=file_key,
+            target_triangles=10000,  # Default for preview
+            status="pending",
+            expires_at=datetime.utcnow() + timedelta(hours=24)
+        )
+        db.add(job)
+        db.commit()
+        
+        # Queue preview generation job
+        redis_client = await get_redis()
+        job_id = await queue_optimize_job(redis_client, job.id, preview_only=True)
+        
+        return {
+            "job_id": job.id,
+            "status": "pending",
+            "message": "Preview generation in progress"
+        }
+    finally:
+        # Clean up temp file
+        if os.path.exists(tmp_path):
+            os.unlink(tmp_path)
+
+@router.post("/optimize")
+async def optimize_model(
+    file: UploadFile = File(...),
+    target_triangles: int = Form(...),
+    user: UserPlan = Depends(get_current_user),
+    db: Session = Depends(get_db),
+    b2 = Depends(get_b2)
+):
+    """Upload and optimize a 3D model"""
+    # Validate file type
+    file_ext = os.path.splitext(file.filename)[1].lower()
+    if file_ext not in ALLOWED_EXTENSIONS:
+        raise HTTPException(status_code=400, detail=f"Invalid file type. Allowed types: {', '.join(ALLOWED_EXTENSIONS)}")
+    
+    # Validate target triangles
+    if target_triangles < 1000 or target_triangles > 100000:
+        raise HTTPException(status_code=400, detail="Target triangles must be between 1,000 and 100,000")
+    
+    # Read file
+    contents = await file.read()
+    
+    # Check file size
+    if len(contents) > MAX_FILE_SIZE:
+        raise HTTPException(status_code=400, detail=f"File too large. Maximum size: {MAX_FILE_SIZE / 1024 / 1024}MB")
+    
+    # Generate unique filename
+    unique_id = str(uuid.uuid4())
+    file_key = f"uploads/{user.email}/{unique_id}{file_ext}"
+    
+    # Save file to temp directory
+    with tempfile.NamedTemporaryFile(delete=False) as tmp:
+        tmp.write(contents)
+        tmp_path = tmp.name
+    
+    try:
+        # Upload to B2
+        bucket = b2.get_bucket_by_name(os.getenv("B2_BUCKET"))
+        bucket.upload_local_file(tmp_path, file_key)
+        
+        # Create job record
+        job = OptimizationJob(
+            user_email=user.email,
+            input_file=file_key,
+            target_triangles=target_triangles,
+            status="pending",
+            is_paid=True,  # User is authenticated, so job is paid
+            expires_at=datetime.utcnow() + timedelta(hours=24)
+        )
+        db.add(job)
+        
+        # Reduce user quota for single-export plan
+        if user.plan == "single":
+            user.quota -= 1
+        
+        db.commit()
+        
+        # Queue optimization job
+        redis_client = await get_redis()
+        job_id = await queue_optimize_job(redis_client, job.id)
+        
+        return {
+            "job_id": job.id,
+            "status": "pending",
+            "message": "Optimization job queued"
+        }
+    finally:
+        # Clean up temp file
+        if os.path.exists(tmp_path):
+            os.unlink(tmp_path)
+
+@router.get("/status/{job_id}")
+async def get_job_status(
+    job_id: int,
+    db: Session = Depends(get_db)
+):
+    """Check the status of an optimization job"""
+    job = db.query(OptimizationJob).filter(OptimizationJob.id == job_id).first()
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found")
+    
+    response = {
+        "status": job.status,
+        "created_at": job.created_at.isoformat(),
+    }
+    
+    if job.status == "completed":
+        response["vertex_count_before"] = job.vertex_count_before
+        response["vertex_count_after"] = job.vertex_count_after
+        
+        if job.preview_file:
+            b2 = get_b2()
+            bucket = b2.get_bucket_by_name(os.getenv("B2_BUCKET"))
+            preview_url = bucket.get_download_url(job.preview_file, expires_in=3600)
+            response["preview_url"] = preview_url
+    
+    elif job.status == "failed":
+        response["error_message"] = job.error_message
+    
+    return response
+
+@router.get("/download/{job_id}")
+async def download_optimized_model(
+    job_id: int,
+    user: UserPlan = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Download an optimized model"""
+    job = db.query(OptimizationJob).filter(OptimizationJob.id == job_id).first()
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found")
+    
+    # Check job ownership
+    if job.user_email != user.email:
+        raise HTTPException(status_code=403, detail="You don't have permission to access this job")
+    
+    # Check if job is completed
+    if job.status != "completed":
+        raise HTTPException(status_code=400, detail=f"Job is not ready for download. Current status: {job.status}")
+    
+    # Check if output file exists
+    if not job.output_file:
+        raise HTTPException(status_code=400, detail="Output file not available")
+    
+    # Generate signed URL for download
+    b2 = get_b2()
+    bucket = b2.get_bucket_by_name(os.getenv("B2_BUCKET"))
+    download_url = bucket.get_download_url(job.output_file, expires_in=3600)
+    
+    return RedirectResponse(url=download_url) 

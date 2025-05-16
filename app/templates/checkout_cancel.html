@@ -1,0 +1,35 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+    <div class="bg-white shadow overflow-hidden sm:rounded-lg">
+        <div class="px-4 py-5 sm:px-6">
+            <h3 class="text-lg leading-6 font-medium text-gray-900">
+                <i class="fas fa-times-circle text-red-500 mr-2"></i> Payment Cancelled
+            </h3>
+            <p class="mt-1 max-w-2xl text-sm text-gray-500">
+                Your payment was not completed.
+            </p>
+        </div>
+        <div class="border-t border-gray-200 px-4 py-5 sm:p-6">
+            <div class="text-center">
+                <h2 class="text-3xl font-extrabold text-gray-900 mb-4">
+                    Payment Cancelled
+                </h2>
+                <p class="text-lg text-gray-500 mb-6">
+                    No charges have been made to your account. If you experienced any issues, please try again.
+                </p>
+                
+                <div class="mt-8 flex justify-center space-x-4">
+                    <a href="/" class="inline-flex items-center px-4 py-2 border border-gray-300 shadow-sm text-base font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50">
+                        Return to Homepage
+                    </a>
+                    <a href="#pricing" class="inline-flex items-center px-4 py-2 border border-transparent shadow-sm text-base font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700">
+                        View Pricing Options
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %} 

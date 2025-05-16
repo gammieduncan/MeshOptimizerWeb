@@ -1,0 +1,58 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+    <div class="bg-white shadow overflow-hidden sm:rounded-lg">
+        <div class="px-4 py-5 sm:px-6">
+            <h3 class="text-lg leading-6 font-medium text-gray-900">
+                <i class="fas fa-check-circle text-green-500 mr-2"></i> Payment Successful
+            </h3>
+            <p class="mt-1 max-w-2xl text-sm text-gray-500">
+                Thank you for your purchase!
+            </p>
+        </div>
+        <div class="border-t border-gray-200 px-4 py-5 sm:p-6">
+            <div class="text-center">
+                <h2 class="text-3xl font-extrabold text-gray-900 mb-4">
+                    {% if product_id == "EXPORT_1" %}
+                        Single Export
+                    {% else %}
+                        Creator Plan
+                    {% endif %}
+                </h2>
+                <p class="text-lg text-gray-500 mb-6">
+                    {% if product_id == "EXPORT_1" %}
+                        You now have 1 export credit available.
+                    {% else %}
+                        You now have unlimited exports for the next 30 days.
+                    {% endif %}
+                </p>
+                
+                <div class="bg-gray-50 p-4 rounded-lg mb-6 max-w-md mx-auto">
+                    <p class="text-sm text-gray-700 mb-2">Your account email:</p>
+                    <p class="text-lg font-medium text-indigo-600">{{ email }}</p>
+                </div>
+                
+                <div class="mt-8 flex justify-center">
+                    <a href="/" class="inline-flex items-center px-4 py-2 border border-transparent shadow-sm text-base font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700">
+                        Return to Homepage
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    // Store auth token when page loads
+    document.addEventListener('DOMContentLoaded', () => {
+        const token = "{{ token }}";
+        if (token) {
+            localStorage.setItem('auth_token', token);
+            console.log('Authentication token stored');
+        }
+    });
+</script>
+{% endblock %} 
