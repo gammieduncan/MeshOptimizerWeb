@@ -146,7 +146,7 @@
                     <div class="px-4 py-5 sm:px-6 flex justify-between items-center">
                         <div>
                             <h3 class="text-lg leading-6 font-medium text-gray-900">Model Preview</h3>
-                            <p class="mt-1 max-w-2xl text-sm text-gray-500">Watermarked preview at <span id="preview-triangle-count">10,000</span> triangles</p>
+                            <p class="mt-1 max-w-2xl text-sm text-gray-500">Preview sample at 10,000 triangles <span class="text-xs">(Fixed sample, not affected by slider)</span></p>
                         </div>
                         <a id="view-fullscreen" href="#" class="text-indigo-600 hover:text-indigo-800">
                             <i class="fas fa-expand"></i> Full Screen
@@ -164,13 +164,19 @@
                 
                 <!-- Target Triangle Slider -->
                 <div class="mt-6">
-                    <label for="target-slider" class="block text-sm font-medium text-gray-700">Target Triangle Count</label>
+                    <label for="target-slider" class="block text-sm font-medium text-gray-700">Target Triangle Count for Final Export</label>
                     <input type="range" id="target-slider" name="target-slider" min="1000" max="100000" step="100" value="10000" 
                         class="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer mt-2">
                     <div class="flex justify-between text-xs text-gray-500 mt-1">
                         <span>1,000</span>
                         <span id="current-target">10,000</span>
                         <span>100,000</span>
+                    </div>
+                    <div class="mt-2 p-2 bg-blue-50 rounded-md border border-blue-200">
+                        <p class="text-sm text-blue-800">
+                            <i class="fas fa-info-circle mr-1"></i> The preview above is a fixed sample (10,000 triangles). 
+                            This slider sets the target triangle count for your final optimized model after purchase.
+                        </p>
                     </div>
                 </div>
                 
@@ -463,13 +469,20 @@
                         // Display preview
                         previewContainer.classList.remove('hidden');
                         
+                        // Log the vertex counts for debugging
+                        debugLog(`Vertex counts from API - Before: ${data.vertex_count_before}, After: ${data.vertex_count_after}`);
+                        
                         // Update vertex counts
                         if (data.vertex_count_before) {
                             originalCount.textContent = data.vertex_count_before.toLocaleString();
+                        } else {
+                            debugLog("Warning: No vertex_count_before in API response");
                         }
                         
                         if (data.vertex_count_after) {
                             reducedCount.textContent = data.vertex_count_after.toLocaleString();
+                        } else {
+                            debugLog("Warning: No vertex_count_after in API response");
                         }
                         
                         // Check if we have a preview URL
@@ -503,77 +516,96 @@
         
         // Initialize 3D preview
         function initPreview(modelUrl) {
-            const container = document.getElementById('preview-canvas');
-            
-            // Initialize Three.js scene
-            scene = new THREE.Scene();
-            scene.background = new THREE.Color(0xf3f4f6);
-            
-            // Camera
-            camera = new THREE.PerspectiveCamera(45, container.clientWidth / container.clientHeight, 0.1, 1000);
-            camera.position.set(0, 1, 5);
-            
-            // Renderer
-            renderer = new THREE.WebGLRenderer({ antialias: true });
-            renderer.setSize(container.clientWidth, container.clientHeight);
-            renderer.outputEncoding = THREE.sRGBEncoding;
-            renderer.shadowMap.enabled = true;
-            container.appendChild(renderer.domElement);
-            
-            // Controls
-            controls = new THREE.OrbitControls(camera, renderer.domElement);
-            controls.enableDamping = true;
-            controls.dampingFactor = 0.05;
-            
-            // Lights
-            const ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
-            scene.add(ambientLight);
-            
-            const directionalLight = new THREE.DirectionalLight(0xffffff, 1);
-            directionalLight.position.set(1, 1, 1);
-            scene.add(directionalLight);
-            
-            // Load model
-            const loader = new THREE.GLTFLoader();
-            loader.load(
-                modelUrl,
-                function (gltf) {
-                    model = gltf.scene;
-                    
-                    // Center model
-                    const box = new THREE.Box3().setFromObject(model);
-                    const center = box.getCenter(new THREE.Vector3());
-                    const size = box.getSize(new THREE.Vector3());
-                    
-                    // Reset model position to center
-                    model.position.x = -center.x;
-                    model.position.y = -center.y;
-                    model.position.z = -center.z;
-                    
-                    // Adjust camera
-                    const maxDim = Math.max(size.x, size.y, size.z);
-                    camera.position.set(0, maxDim / 2, maxDim * 2);
-                    camera.lookAt(0, 0, 0);
-                    
-                    // Add model to scene
-                    scene.add(model);
-                    
-                    // Add watermark
-                    addWatermark();
-                    
-                    // Start animation loop
-                    animate();
-                },
-                function (xhr) {
-                    // Progress callback
-                },
-                function (error) {
-                    console.error('Error loading model:', error);
-                }
-            );
-            
-            // Handle window resize
-            window.addEventListener('resize', onWindowResize);
+            try {
+                debugLog("Starting initPreview with Three.js version: " + THREE.REVISION);
+                const container = document.getElementById('preview-canvas');
+                
+                // Check if required components exist
+                debugLog("Checking Three.js components: " + 
+                    "Scene: " + (typeof THREE.Scene !== 'undefined') + 
+                    ", WebGLRenderer: " + (typeof THREE.WebGLRenderer !== 'undefined') +
+                    ", OrbitControls: " + (typeof THREE.OrbitControls !== 'undefined') +
+                    ", GLTFLoader: " + (typeof THREE.GLTFLoader !== 'undefined'));
+                
+                // Initialize Three.js scene
+                scene = new THREE.Scene();
+                scene.background = new THREE.Color(0xf3f4f6);
+                
+                // Camera
+                camera = new THREE.PerspectiveCamera(45, container.clientWidth / container.clientHeight, 0.1, 1000);
+                camera.position.set(0, 1, 5);
+                
+                // Renderer
+                renderer = new THREE.WebGLRenderer({ antialias: true });
+                renderer.setSize(container.clientWidth, container.clientHeight);
+                renderer.outputEncoding = THREE.sRGBEncoding;
+                renderer.shadowMap.enabled = true;
+                container.appendChild(renderer.domElement);
+                
+                // Controls
+                debugLog("Creating OrbitControls");
+                controls = new THREE.OrbitControls(camera, renderer.domElement);
+                controls.enableDamping = true;
+                controls.dampingFactor = 0.05;
+                
+                // Lights
+                const ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
+                scene.add(ambientLight);
+                
+                const directionalLight = new THREE.DirectionalLight(0xffffff, 1);
+                directionalLight.position.set(1, 1, 1);
+                scene.add(directionalLight);
+                
+                // Load model
+                debugLog("Creating GLTFLoader");
+                const loader = new THREE.GLTFLoader();
+                debugLog("Loading model: " + modelUrl);
+                loader.load(
+                    modelUrl,
+                    function (gltf) {
+                        debugLog("Model loaded successfully");
+                        model = gltf.scene;
+                        
+                        // Center model
+                        const box = new THREE.Box3().setFromObject(model);
+                        const center = box.getCenter(new THREE.Vector3());
+                        const size = box.getSize(new THREE.Vector3());
+                        
+                        // Reset model position to center
+                        model.position.x = -center.x;
+                        model.position.y = -center.y;
+                        model.position.z = -center.z;
+                        
+                        // Adjust camera
+                        const maxDim = Math.max(size.x, size.y, size.z);
+                        camera.position.set(0, maxDim / 2, maxDim * 2);
+                        camera.lookAt(0, 0, 0);
+                        
+                        // Add model to scene
+                        scene.add(model);
+                        
+                        // Add watermark
+                        addWatermark();
+                        
+                        // Start animation loop
+                        animate();
+                    },
+                    function (xhr) {
+                        // Progress callback
+                        debugLog("Loading progress: " + Math.round((xhr.loaded / xhr.total) * 100) + "%");
+                    },
+                    function (error) {
+                        debugLog("Error loading model: " + error);
+                        console.error('Error loading model:', error);
+                    }
+                );
+                
+                // Handle window resize
+                window.addEventListener('resize', onWindowResize);
+            } catch (error) {
+                debugLog("Error in initPreview: " + error.message);
+                console.error("Error in initPreview:", error);
+            }
         }
         
         // Add watermark to preview
@@ -648,12 +680,26 @@
             const value = targetSlider.value;
             currentTarget.textContent = parseInt(value).toLocaleString();
             
-            // Update preview triangle count
-            document.getElementById('preview-triangle-count').textContent = parseInt(value).toLocaleString();
+            // Don't update the preview text - it's a fixed preview
             
-            // Update reduced count if we have a preview
-            if (model) {
-                reducedCount.textContent = parseInt(value).toLocaleString();
+            // Add visual feedback that this is just a target setting
+            const sliderFeedback = document.getElementById('slider-feedback');
+            if (!sliderFeedback) {
+                const feedbackEl = document.createElement('div');
+                feedbackEl.id = 'slider-feedback';
+                feedbackEl.className = 'text-xs text-indigo-600 font-medium mt-1 transition-opacity duration-1000';
+                feedbackEl.textContent = 'Target set for final export. The preview above is a fixed sample.';
+                document.querySelector('.mt-6').appendChild(feedbackEl);
+                
+                // Fade out after 3 seconds
+                setTimeout(() => {
+                    feedbackEl.style.opacity = '0';
+                    setTimeout(() => {
+                        if (feedbackEl.parentNode) {
+                            feedbackEl.parentNode.removeChild(feedbackEl);
+                        }
+                    }, 1000);
+                }, 3000);
             }
         });
         

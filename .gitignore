@@ -53,3 +53,14 @@ temp/
 # Local development
 .fly
 *.pem 
+
+# Model files
+*.glb
+*.gltf
+*.obj
+*.stl
+*.gltfpack
+
+# DB
+*.rdb
+*.db
