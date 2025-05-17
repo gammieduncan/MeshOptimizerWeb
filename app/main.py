@@ -9,8 +9,15 @@ from app.deps import get_db
 
 app = FastAPI(title="Poly Slimmer", description="Polygon reducer for 3D models")
 
+# Create uploads directory if it doesn't exist
+uploads_dir = Path("uploads")
+uploads_dir.mkdir(exist_ok=True)
+
 # Mount static files
 app.mount("/static", StaticFiles(directory=Path(__file__).parent / "static"), name="static")
+
+# Mount uploads directory for development/testing
+app.mount("/uploads", StaticFiles(directory=uploads_dir), name="uploads")
 
 # Templates
 templates = Jinja2Templates(directory=Path(__file__).parent / "templates")

@@ -1,5 +1,38 @@
 {% extends "base.html" %}
 
+{% block head %}
+<!-- Add debugging console styles -->
+<style>
+    #debug-console {
+        display: none;
+        position: fixed;
+        bottom: 10px;
+        right: 10px;
+        width: 300px;
+        max-height: 300px;
+        overflow-y: auto;
+        background: rgba(0,0,0,0.8);
+        color: #fff;
+        padding: 10px;
+        font-family: monospace;
+        z-index: 9999;
+        border-radius: 5px;
+    }
+    #debug-toggle {
+        position: fixed;
+        bottom: 10px;
+        right: 10px;
+        background: #6366F1;
+        color: white;
+        border: none;
+        padding: 5px 10px;
+        border-radius: 5px;
+        cursor: pointer;
+        z-index: 10000;
+    }
+</style>
+{% endblock %}
+
 {% block content %}
 <!-- Hero Section -->
 <div class="bg-white">
@@ -282,6 +315,10 @@
         </div>
     </div>
 </div>
+
+<!-- Debug Console -->
+<button id="debug-toggle">Debug</button>
+<div id="debug-console"></div>
 {% endblock %}
 
 {% block scripts %}
@@ -299,6 +336,24 @@
         const reducedCount = document.getElementById('reduced-count');
         const optimizeButton = document.getElementById('optimize-button');
         const purchaseOptions = document.getElementById('purchase-options');
+        
+        // Debug console elements
+        const debugToggle = document.getElementById('debug-toggle');
+        const debugConsole = document.getElementById('debug-console');
+        
+        // Toggle debug console
+        debugToggle.addEventListener('click', () => {
+            debugConsole.style.display = debugConsole.style.display === 'none' ? 'block' : 'none';
+        });
+        
+        // Debug log function
+        function debugLog(message) {
+            const logLine = document.createElement('div');
+            logLine.textContent = `[${new Date().toLocaleTimeString()}] ${message}`;
+            debugConsole.appendChild(logLine);
+            debugConsole.scrollTop = debugConsole.scrollHeight;
+            console.log(message);
+        }
         
         let jobId = null;
         let fileToUpload = null;
@@ -350,18 +405,36 @@
             
             xhr.onload = function() {
                 if (xhr.status === 200) {
-                    const response = JSON.parse(xhr.responseText);
-                    jobId = response.job_id;
-                    
-                    // Poll for job status
-                    pollJobStatus(jobId);
+                    try {
+                        const response = JSON.parse(xhr.responseText);
+                        jobId = response.job_id;
+                        
+                        debugLog(`Upload response: ${JSON.stringify(response)}`);
+                        
+                        // If status is already "completed" (local development), display preview
+                        if (response.status === "completed") {
+                            debugLog("Job already completed (local development mode)");
+                            progressText.textContent = 'Processing complete!';
+                            previewContainer.classList.remove('hidden');
+                            pollJobStatus(jobId); // Still poll once to get the preview URL
+                        } else {
+                            // Poll for job status
+                            debugLog("Starting polling for job status");
+                            pollJobStatus(jobId);
+                        }
+                    } catch (e) {
+                        debugLog(`Error parsing response: ${e.message}`);
+                        alert('Error processing server response');
+                    }
                 } else {
+                    debugLog(`Upload failed with status ${xhr.status}: ${xhr.responseText}`);
                     alert('Upload failed. Please try again.');
                     uploadProgress.classList.add('hidden');
                 }
             };
             
             xhr.onerror = function() {
+                debugLog(`Network error during upload`);
                 alert('Upload failed. Please try again.');
                 uploadProgress.classList.add('hidden');
             };
@@ -372,40 +445,60 @@
         
         // Poll job status
         function pollJobStatus(id) {
-            const pollInterval = setInterval(() => {
-                fetch(`/api/status/${id}`)
-                    .then(response => response.json())
-                    .then(data => {
-                        if (data.status === 'completed') {
-                            clearInterval(pollInterval);
-                            progressText.textContent = 'Processing complete!';
-                            
-                            // Display preview
-                            previewContainer.classList.remove('hidden');
-                            
-                            // Update vertex counts
-                            if (data.vertex_count_before) {
-                                originalCount.textContent = data.vertex_count_before.toLocaleString();
-                            }
-                            
-                            if (data.vertex_count_after) {
-                                reducedCount.textContent = data.vertex_count_after.toLocaleString();
-                            }
-                            
-                            // Initialize 3D preview
-                            initPreview(data.preview_url);
-                            
-                        } else if (data.status === 'failed') {
-                            clearInterval(pollInterval);
-                            progressText.textContent = `Error: ${data.error_message || 'Processing failed'}`;
-                        } else {
-                            progressText.textContent = 'Processing...';
+            debugLog(`Polling status for job ${id}`);
+            
+            fetch(`/api/status/${id}`)
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error(`HTTP error ${response.status}`);
+                    }
+                    return response.json();
+                })
+                .then(data => {
+                    debugLog(`Status response: ${JSON.stringify(data)}`);
+                    
+                    if (data.status === 'completed') {
+                        progressText.textContent = 'Processing complete!';
+                        
+                        // Display preview
+                        previewContainer.classList.remove('hidden');
+                        
+                        // Update vertex counts
+                        if (data.vertex_count_before) {
+                            originalCount.textContent = data.vertex_count_before.toLocaleString();
                         }
-                    })
-                    .catch(error => {
-                        console.error('Error polling job status:', error);
-                    });
-            }, 2000);
+                        
+                        if (data.vertex_count_after) {
+                            reducedCount.textContent = data.vertex_count_after.toLocaleString();
+                        }
+                        
+                        // Check if we have a preview URL
+                        if (data.preview_url && data.preview_url !== '#') {
+                            debugLog(`Initializing preview with URL: ${data.preview_url}`);
+                            initPreview(data.preview_url);
+                        } else {
+                            debugLog(`No valid preview URL found`);
+                            // If no preview URL, show a placeholder
+                            document.getElementById('preview-canvas').innerHTML = 
+                                '<div class="flex items-center justify-center h-full bg-gray-200">' +
+                                '<p class="text-gray-500">Preview not available</p>' +
+                                '</div>';
+                        }
+                    } else if (data.status === 'failed') {
+                        progressText.textContent = `Error: ${data.error_message || 'Processing failed'}`;
+                        debugLog(`Job failed: ${data.error_message || 'Unknown error'}`);
+                    } else {
+                        progressText.textContent = 'Processing...';
+                        // Continue polling if still processing
+                        setTimeout(() => pollJobStatus(id), 2000);
+                    }
+                })
+                .catch(error => {
+                    debugLog(`Error polling job status: ${error.message}`);
+                    console.error('Error polling job status:', error);
+                    // Retry after delay
+                    setTimeout(() => pollJobStatus(id), 5000);
+                });
         }
         
         // Initialize 3D preview

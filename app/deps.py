@@ -47,8 +47,19 @@ def get_b2():
     """Get Backblaze B2 client"""
     info = InMemoryAccountInfo()
     b2_api = B2Api(info)
-    b2_api.authorize_account("production", B2_KEY_ID, B2_KEY)
-    return b2_api
+    
+    if not B2_KEY_ID or not B2_KEY:
+        print("WARNING: B2 credentials not configured. File storage will not work.")
+        # Create dummy B2 API client for testing
+        return b2_api
+    
+    try:
+        b2_api.authorize_account("production", B2_KEY_ID, B2_KEY)
+        return b2_api
+    except Exception as e:
+        print(f"Error authorizing B2 account: {str(e)}")
+        # Return unauthorized client - operations will fail but won't crash immediately
+        return b2_api
 
 @lru_cache()
 def get_redis():
