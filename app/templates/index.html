@@ -146,16 +146,21 @@
                     <div class="px-4 py-5 sm:px-6 flex justify-between items-center">
                         <div>
                             <h3 class="text-lg leading-6 font-medium text-gray-900">Model Preview</h3>
-                            <p class="mt-1 max-w-2xl text-sm text-gray-500">Preview sample at 10,000 triangles <span class="text-xs">(Fixed sample, not affected by slider)</span></p>
+                            <p class="mt-1 max-w-2xl text-sm text-gray-500">
+                                <span class="inline-flex items-center font-medium text-indigo-800 bg-indigo-100 px-2 py-0.5 rounded-full text-xs mr-1">
+                                    Sample preview
+                                </span>
+                                <span class="text-xs">Use Update Preview button to see different reduction levels</span>
+                            </p>
                         </div>
                         <a id="view-fullscreen" href="#" class="text-indigo-600 hover:text-indigo-800">
                             <i class="fas fa-expand"></i> Full Screen
                         </a>
                     </div>
                     <div class="border-t border-gray-200">
-                        <div class="canvas-container" id="preview-canvas">
+                        <div class="canvas-container relative" id="preview-canvas">
                             <!-- Three.js canvas will be inserted here -->
-                            <div class="absolute top-2 left-2 bg-black bg-opacity-50 text-white px-3 py-1 rounded-lg" id="vertex-count">
+                            <div class="absolute top-2 left-2 bg-black bg-opacity-50 text-white px-3 py-1 rounded-lg z-10" id="vertex-count">
                                 Original: <span id="original-count">0</span> | Reduced: <span id="reduced-count">0</span>
                             </div>
                         </div>
@@ -165,17 +170,31 @@
                 <!-- Target Triangle Slider -->
                 <div class="mt-6">
                     <label for="target-slider" class="block text-sm font-medium text-gray-700">Target Triangle Count for Final Export</label>
-                    <input type="range" id="target-slider" name="target-slider" min="1000" max="100000" step="100" value="10000" 
-                        class="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer mt-2">
-                    <div class="flex justify-between text-xs text-gray-500 mt-1">
+                    <div class="flex items-center mb-2">
+                        <input type="range" id="target-slider" name="target-slider" min="1000" max="100000" step="100" value="10000" 
+                            class="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer">
+                        <div class="ml-3 w-24 text-sm font-bold text-indigo-600 border border-indigo-200 rounded px-2 py-1 bg-indigo-50">
+                            <span id="current-target">10,000</span>
+                        </div>
+                    </div>
+                    <div class="flex justify-between text-xs text-gray-500 mb-3">
                         <span>1,000</span>
-                        <span id="current-target">10,000</span>
+                        <span>50,000</span>
                         <span>100,000</span>
+                    </div>
+                    <div class="flex justify-between items-center mt-3">
+                        <button id="update-preview-btn" class="px-3 py-1.5 border border-indigo-500 text-indigo-600 rounded-md text-sm font-medium hover:bg-indigo-50 transition">
+                            <i class="fas fa-sync-alt mr-1"></i> Update Preview
+                        </button>
+                        <div class="text-xs text-gray-500">
+                            See how your model looks at this triangle count
+                        </div>
                     </div>
                     <div class="mt-2 p-2 bg-blue-50 rounded-md border border-blue-200">
                         <p class="text-sm text-blue-800">
-                            <i class="fas fa-info-circle mr-1"></i> The preview above is a fixed sample (10,000 triangles). 
-                            This slider sets the target triangle count for your final optimized model after purchase.
+                            <i class="fas fa-info-circle mr-1"></i> 
+                            Use the slider to set triangle count and click "Update Preview" to see the result.
+                            Purchase to download the final optimized model.
                         </p>
                     </div>
                 </div>
@@ -469,34 +488,8 @@
                         // Display preview
                         previewContainer.classList.remove('hidden');
                         
-                        // Log the vertex counts for debugging
-                        debugLog(`Vertex counts from API - Before: ${data.vertex_count_before}, After: ${data.vertex_count_after}`);
-                        
-                        // Update vertex counts
-                        if (data.vertex_count_before) {
-                            originalCount.textContent = data.vertex_count_before.toLocaleString();
-                        } else {
-                            debugLog("Warning: No vertex_count_before in API response");
-                        }
-                        
-                        if (data.vertex_count_after) {
-                            reducedCount.textContent = data.vertex_count_after.toLocaleString();
-                        } else {
-                            debugLog("Warning: No vertex_count_after in API response");
-                        }
-                        
-                        // Check if we have a preview URL
-                        if (data.preview_url && data.preview_url !== '#') {
-                            debugLog(`Initializing preview with URL: ${data.preview_url}`);
-                            initPreview(data.preview_url);
-                        } else {
-                            debugLog(`No valid preview URL found`);
-                            // If no preview URL, show a placeholder
-                            document.getElementById('preview-canvas').innerHTML = 
-                                '<div class="flex items-center justify-center h-full bg-gray-200">' +
-                                '<p class="text-gray-500">Preview not available</p>' +
-                                '</div>';
-                        }
+                        // Use our updatePreviewDisplay function for consistent handling
+                        updatePreviewDisplay(data);
                     } else if (data.status === 'failed') {
                         progressText.textContent = `Error: ${data.error_message || 'Processing failed'}`;
                         debugLog(`Job failed: ${data.error_message || 'Unknown error'}`);
@@ -526,6 +519,20 @@
                     ", WebGLRenderer: " + (typeof THREE.WebGLRenderer !== 'undefined') +
                     ", OrbitControls: " + (typeof THREE.OrbitControls !== 'undefined') +
                     ", GLTFLoader: " + (typeof THREE.GLTFLoader !== 'undefined'));
+                
+                // Make sure vertex count element is preserved
+                const vertexCountEl = document.getElementById('vertex-count');
+                if (vertexCountEl) {
+                    vertexCountEl.style.display = 'block';
+                }
+                
+                // Clear container while preserving vertex count element
+                const childNodes = Array.from(container.childNodes);
+                for (const child of childNodes) {
+                    if (child !== vertexCountEl) {
+                        container.removeChild(child);
+                    }
+                }
                 
                 // Initialize Three.js scene
                 scene = new THREE.Scene();
@@ -688,7 +695,7 @@
                 const feedbackEl = document.createElement('div');
                 feedbackEl.id = 'slider-feedback';
                 feedbackEl.className = 'text-xs text-indigo-600 font-medium mt-1 transition-opacity duration-1000';
-                feedbackEl.textContent = 'Target set for final export. The preview above is a fixed sample.';
+                feedbackEl.textContent = `Set to ${parseInt(value).toLocaleString()} triangles. Click "Update Preview" to see this reduction level.`;
                 document.querySelector('.mt-6').appendChild(feedbackEl);
                 
                 // Fade out after 3 seconds
@@ -741,6 +748,191 @@
                 alert('Error: ' + error.message);
             });
         });
+        
+        // Event: Update Preview button click
+        const updatePreviewBtn = document.getElementById('update-preview-btn');
+        updatePreviewBtn.addEventListener('click', () => {
+            if (!fileToUpload) {
+                alert('Please upload a file first');
+                return;
+            }
+            
+            // Show loading state
+            updatePreviewBtn.disabled = true;
+            updatePreviewBtn.innerHTML = '<i class="fas fa-spinner fa-spin mr-1"></i> Updating...';
+            
+            // Properly clean up previous Three.js instance if it exists
+            if (renderer && renderer.dispose) {
+                renderer.dispose();
+                // Don't remove from DOM here, we'll handle that in initPreview
+            }
+            
+            // Clear any watermark overlays
+            const watermarkOverlays = document.querySelectorAll('#preview-canvas div[style*="watermark"]');
+            watermarkOverlays.forEach(overlay => overlay.remove());
+            
+            // Clear scene
+            if (scene) {
+                while(scene.children.length > 0){ 
+                    scene.remove(scene.children[0]); 
+                }
+                scene = null;
+            }
+            
+            // Release model resources
+            model = null;
+            
+            // Add loading indicator to canvas (make sure it's inside the canvas but not blocking other elements)
+            const loadingOverlay = document.createElement('div');
+            loadingOverlay.id = 'preview-loading';
+            loadingOverlay.className = 'absolute inset-0 flex items-center justify-center bg-gray-100 bg-opacity-80 z-20';
+            loadingOverlay.innerHTML = `
+                <div class="text-center">
+                    <div class="inline-block animate-spin rounded-full h-8 w-8 border-4 border-indigo-500 border-t-transparent"></div>
+                    <p class="mt-2 text-indigo-600 font-medium">Generating preview...</p>
+                </div>
+            `;
+            document.getElementById('preview-canvas').appendChild(loadingOverlay);
+            
+            // Create form data with the target triangle count
+            const formData = new FormData();
+            formData.append('file', fileToUpload);
+            formData.append('target_triangles', targetSlider.value);
+            
+            // Request a new preview
+            fetch('/api/preview', {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error('Preview generation failed');
+                }
+                return response.json();
+            })
+            .then(data => {
+                debugLog(`New preview response: ${JSON.stringify(data)}`);
+                jobId = data.job_id;
+                
+                // If status is already completed, update preview immediately
+                if (data.status === "completed" && data.preview_url) {
+                    updatePreviewDisplay(data);
+                } else {
+                    // Poll for job status
+                    pollPreviewJobStatus(jobId);
+                }
+            })
+            .catch(error => {
+                debugLog(`Error generating preview: ${error.message}`);
+                alert('Error: ' + error.message);
+                
+                // Reset button state
+                updatePreviewBtn.disabled = false;
+                updatePreviewBtn.innerHTML = '<i class="fas fa-sync-alt mr-1"></i> Update Preview';
+                
+                // Remove loading overlay
+                const loadingOverlay = document.getElementById('preview-loading');
+                if (loadingOverlay) {
+                    loadingOverlay.remove();
+                }
+            });
+        });
+        
+        // Poll preview job status
+        function pollPreviewJobStatus(id) {
+            debugLog(`Polling status for preview job ${id}`);
+            
+            fetch(`/api/status/${id}`)
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error(`HTTP error ${response.status}`);
+                    }
+                    return response.json();
+                })
+                .then(data => {
+                    debugLog(`Preview status response: ${JSON.stringify(data)}`);
+                    
+                    if (data.status === 'completed') {
+                        // Update the preview display
+                        updatePreviewDisplay(data);
+                    } else if (data.status === 'failed') {
+                        debugLog(`Preview job failed: ${data.error_message || 'Unknown error'}`);
+                        alert(`Error generating preview: ${data.error_message || 'Unknown error'}`);
+                        
+                        // Reset button state
+                        updatePreviewBtn.disabled = false;
+                        updatePreviewBtn.innerHTML = '<i class="fas fa-sync-alt mr-1"></i> Update Preview';
+                        
+                        // Remove loading overlay
+                        const loadingOverlay = document.getElementById('preview-loading');
+                        if (loadingOverlay) {
+                            loadingOverlay.remove();
+                        }
+                    } else {
+                        // Continue polling if still processing
+                        setTimeout(() => pollPreviewJobStatus(id), 2000);
+                    }
+                })
+                .catch(error => {
+                    debugLog(`Error polling preview job status: ${error.message}`);
+                    console.error('Error polling preview job status:', error);
+                    // Retry after delay
+                    setTimeout(() => pollPreviewJobStatus(id), 5000);
+                });
+        }
+        
+        // Update the preview display with new data
+        function updatePreviewDisplay(data) {
+            debugLog("Updating preview display with data: " + JSON.stringify(data));
+            
+            // Ensure we have vertex counts before proceeding
+            if (!data.vertex_count_before || !data.vertex_count_after) {
+                debugLog("WARNING: Missing vertex count data in preview response");
+                data.vertex_count_before = data.vertex_count_before || 0;
+                data.vertex_count_after = data.vertex_count_after || 0;
+            }
+            
+            // Update triangle counts in the overlay
+            const originalCountEl = document.getElementById('original-count');
+            const reducedCountEl = document.getElementById('reduced-count');
+            
+            if (originalCountEl) {
+                originalCountEl.textContent = parseInt(data.vertex_count_before).toLocaleString();
+                debugLog("Updated original count to: " + originalCountEl.textContent);
+            }
+            
+            if (reducedCountEl) {
+                reducedCountEl.textContent = parseInt(data.vertex_count_after).toLocaleString();
+                debugLog("Updated reduced count to: " + reducedCountEl.textContent);
+            }
+            
+            // Also update the preview text header
+            const previewTextEl = document.querySelector('.mt-1.max-w-2xl.text-sm.text-gray-500');
+            if (previewTextEl) {
+                previewTextEl.innerHTML = `
+                    <span class="inline-flex items-center font-medium text-indigo-800 bg-indigo-100 px-2 py-0.5 rounded-full text-xs mr-1">
+                        ${parseInt(data.vertex_count_after).toLocaleString()} triangles
+                     </span>
+                     <span class="text-xs">from original ${parseInt(data.vertex_count_before).toLocaleString()}</span>`;
+                debugLog("Updated preview header text");
+            }
+            
+            // Initialize 3D preview if we have a URL
+            if (data.preview_url && data.preview_url !== '#') {
+                debugLog(`Initializing new preview with URL: ${data.preview_url}`);
+                initPreview(data.preview_url);
+            }
+            
+            // Reset button state
+            updatePreviewBtn.disabled = false;
+            updatePreviewBtn.innerHTML = '<i class="fas fa-sync-alt mr-1"></i> Update Preview';
+            
+            // Remove loading overlay
+            const loadingOverlay = document.getElementById('preview-loading');
+            if (loadingOverlay) {
+                loadingOverlay.remove();
+            }
+        }
     });
 </script>
 {% endblock %} 
